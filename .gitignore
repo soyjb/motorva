@@ -1,0 +1,70 @@
+﻿# Node.js / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+.npm/
+.pnpm-store/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Java / Spring Boot / Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+.classpath
+.project
+.settings/
+# Retain the Maven wrapper JAR for future checkouts.
+!**/.mvn/wrapper/maven-wrapper.jar
+
+# Common build, test, and cache output
+dist/
+build/
+coverage/
+.cache/
+*.log
+*.tmp
+*.temp
+
+# IntelliJ IDEA / VS Code / Cursor
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.cursor/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Local environment configuration (retain example templates)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.stackdump
