@@ -99,3 +99,23 @@ Run service validation tests with:
 ```powershell
 node --experimental-strip-types --test src/lib/services.test.mjs
 ```
+
+## Maintenance reminders
+
+Set a date, mileage target, or both on the vehicle page. The first reached
+target determines status: past targets are overdue, exact targets are due now,
+and targets within 30 days or 500 miles are due soon. Dates use the browser's
+local calendar day and refresh each minute or when the window regains focus.
+Schedules are entered by the user; Motorva does not infer manufacturer intervals.
+Complete, reopen, edit, or remove reminders. **Mark completed** opens a form
+prefilled with today's date and the current mileage; optional cost and notes
+can be included. Saving creates the service record and completes the reminder
+in one storage write. Canceling changes neither. Completion uses the actual
+service date and does not change the odometer. Reopening or removing a reminder
+keeps its history; completing a reopened reminder records another service.
+Reminders are shown in the app only, with no
+email or push delivery. Legacy saved garages remain compatible.
+
+```powershell
+node --experimental-strip-types --test src/lib/reminders.test.mjs
+```

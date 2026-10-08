@@ -6,6 +6,7 @@ import { CHANGE_EVENT, useGarage } from "@/lib/garage-store";
 import { MAX_YEAR, STORAGE_KEY, updateSavedDetails, type Vehicle } from "@/lib/vehicles";
 import VehicleImage from "./vehicle-image";
 import ServiceHistory from "./service-history";
+import MaintenanceReminders from "./maintenance-reminders";
 
 const numberFormat = new Intl.NumberFormat("en-US");
 
@@ -50,6 +51,7 @@ export default function VehicleDetail({ id }: { id: string }) {
           <div className="vehicle-card detail-photo"><VehicleImage vehicle={vehicle}><span className="detail-placeholder">{vehicle.make} {vehicle.model}</span></VehicleImage></div>
           <div className="detail-summary"><p className="eyebrow">THE ESSENTIALS</p><h2>Vehicle overview</h2><dl><div><dt>Year</dt><dd>{vehicle.year}</dd></div><div><dt>Make</dt><dd>{vehicle.make}</dd></div><div><dt>Model</dt><dd>{vehicle.model}</dd></div><div><dt>Odometer</dt><dd>{numberFormat.format(vehicle.mileage)} <small>mi</small></dd></div></dl><button className="button-secondary" onClick={openEditor}>Update mileage</button></div>
         </section>
+        <MaintenanceReminders vehicle={vehicle} />
         <ServiceHistory vehicle={vehicle} />
         <footer className="garage-footer"><span>YOUR VEHICLES. YOUR JOURNEY.</span><p>Saved in this browser. Available here when you return.</p></footer>
       </>}

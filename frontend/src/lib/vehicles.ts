@@ -1,3 +1,62 @@
+export type MaintenanceReminder = {
+  id: string;
+  title: string;
+  dueDate?: string;
+  dueMileage?: number;
+  completedDate?: string;
+};
+
+function isCalendarDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && value >= "1886-01-01" &&
+    Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+}
+
+export function isReminder(value: unknown): value is MaintenanceReminder {
+  if (typeof value !== "object" || value === null) return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.id === "string" && item.id.length > 0 && typeof item.title === "string" &&
+    item.title.trim().length > 0 && item.title.length <= 80 &&
+    (item.dueDate !== undefined || item.dueMileage !== undefined) &&
+    (item.dueDate === undefined || isCalendarDate(item.dueDate)) &&
+    (item.dueMileage === undefined || (Number.isSafeInteger(item.dueMileage) && Number(item.dueMileage) >= 0 && Number(item.dueMileage) <= 9999999)) &&
+    (item.completedDate === undefined || isCalendarDate(item.completedDate));
+}
+
+export function reminderStatus(item: MaintenanceReminder, mileage: number, today = localDateToday()): "Completed" | "Overdue" | "Due now" | "Due soon" | "Upcoming" {
+  if (item.completedDate) return "Completed";
+  const days = item.dueDate === undefined ? Infinity : (Date.parse(item.dueDate) - Date.parse(today)) / 86400000;
+  const miles = item.dueMileage === undefined ? Infinity : item.dueMileage - mileage;
+  if (days < 0 || miles < 0) return "Overdue";
+  if (days === 0 || miles === 0) return "Due now";
+  if (days <= 30 || miles <= 500) return "Due soon";
+  return "Upcoming";
+}
+
+export function saveReminder(raw: string | null, vehicleId: string, reminder: MaintenanceReminder, editing = false): Vehicle[] {
+  const clean = { ...reminder, title: reminder.title.trim() };
+  if (!isReminder(clean)) throw new Error("Enter a title and valid due date or mileage");
+  const vehicles = readVehicles(raw);
+  const target = vehicles.find(vehicle => vehicle.id === vehicleId);
+  if (!target) throw new Error("Vehicle removed");
+  const items = target.reminders ?? [];
+  if (items.some(item => item.id === clean.id) !== editing) throw new Error("Reminder changed or removed");
+  return vehicles.map(vehicle => vehicle.id === vehicleId ? { ...vehicle, reminders: editing ? items.map(item => item.id === clean.id ? clean : item) : [...items, clean] } : vehicle);
+}
+
+export function changeReminder(raw: string | null, vehicleId: string, id: string, action: "complete" | "reopen" | "remove"): Vehicle[] {
+  const vehicles = readVehicles(raw);
+  const target = vehicles.find(vehicle => vehicle.id === vehicleId);
+  if (!target || !target.reminders?.some(item => item.id === id)) throw new Error("Reminder removed");
+  const reminders = action === "remove" ? target.reminders.filter(item => item.id !== id) : target.reminders.map(item => {
+    if (item.id !== id) return item;
+    const updated = { ...item };
+    if (action === "complete") updated.completedDate = localDateToday();
+    else delete updated.completedDate;
+    return updated;
+  });
+  return vehicles.map(vehicle => vehicle.id === vehicleId ? { ...vehicle, reminders } : vehicle);
+}
+
 export type ServiceRecord = {
   id: string;
   title: string;
@@ -41,6 +100,7 @@ export type Vehicle = {
   mileage: number;
   photo?: string;
   services?: ServiceRecord[];
+  reminders?: MaintenanceReminder[];
 };
 
 export const STORAGE_KEY = "motorva.vehicles.v1";
@@ -63,7 +123,9 @@ export function isVehicle(value: unknown): value is Vehicle {
     Number.isSafeInteger(vehicle.mileage) && Number(vehicle.mileage) >= 0 && Number(vehicle.mileage) <= 9999999 &&
     (vehicle.photo === undefined || isVehiclePhoto(vehicle.photo)) &&
     (vehicle.services === undefined || (Array.isArray(vehicle.services) && vehicle.services.every(isServiceRecord) &&
-      new Set(vehicle.services.map(record => record.id)).size === vehicle.services.length))
+      new Set(vehicle.services.map(record => record.id)).size === vehicle.services.length)) &&
+    (vehicle.reminders === undefined || (Array.isArray(vehicle.reminders) && vehicle.reminders.every(isReminder) &&
+      new Set(vehicle.reminders.map(item => item.id)).size === vehicle.reminders.length))
   );
 }
 
@@ -81,6 +143,19 @@ export function removeSavedVehicle(raw: string | null, id: string): Vehicle[] {
 }
 
 export type VehicleDetails = Pick<Vehicle, "year" | "make" | "model" | "mileage">;
+
+export function completeReminderWithService(raw: string | null, vehicleId: string, reminderId: string, record: ServiceRecord): Vehicle[] {
+  const vehicles = readVehicles(raw);
+  const target = vehicles.find(vehicle => vehicle.id === vehicleId);
+  const reminder = target?.reminders?.find(item => item.id === reminderId);
+  if (!reminder || reminder.completedDate) throw new Error("Reminder removed or already completed");
+  // Build both changes before the caller makes a single storage write.
+  const updated = saveServiceRecord(raw, vehicleId, record);
+  return updated.map(vehicle => vehicle.id === vehicleId ? {
+    ...vehicle,
+    reminders: vehicle.reminders?.map(item => item.id === reminderId ? { ...item, completedDate: record.date } : item),
+  } : vehicle);
+}
 
 export function saveServiceRecord(raw: string | null, vehicleId: string, record: ServiceRecord, editing = false): Vehicle[] {
   const clean = { ...record, title: record.title.trim(), notes: record.notes.trim() };
