@@ -52,6 +52,21 @@ h2 { font-size: 25px; letter-spacing: -.6px; font-weight: 500; margin: 0; }
 .empty-state > p:not(.eyebrow) { font-size: 13px; color: var(--muted); margin: 13px 0 24px; }
 .vehicle-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .vehicle-card { background: #191b17; border: 1px solid #ffffff14; border-radius: 7px; overflow: hidden; }
+.vehicle-carousel { min-width: 0; }
+.garage-heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.garage-order-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.garage-order-row { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #ffffff22; border-radius: 5px; }
+.garage-order-row.drop-target { border-color: var(--accent); background: #d8f36a12; }
+.garage-order-row.dragging { opacity: .55; }
+.order-grip, .order-move-buttons button { min-width: 44px; min-height: 44px; background: transparent; color: var(--muted); border: 0; border-radius: 4px; }
+.order-grip { cursor: grab; touch-action: none; user-select: none; font-size: 25px; }
+.order-grip:active { cursor: grabbing; }
+.order-number { color: var(--accent); font-size: 12px; }
+.order-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.order-move-buttons { display: flex; }
+.order-move-buttons button:disabled { cursor: default; opacity: .25; }
+@media (max-width: 600px) { .garage-heading-actions .button-secondary { padding: 12px; font-size: 12px; } .order-move-buttons { flex-direction: column; } .garage-order-row { gap: 6px; padding: 6px; } }
+.vehicle-slide-controls { display: none; }
 .vehicle-visual { position: relative; min-height: 185px; display: grid; place-items: center; padding: 43px 30px 26px; background: radial-gradient(ellipse at 50% 100%, #4b573133, transparent 75%); border-bottom: 1px solid #ffffff12; }
 .vehicle-visual svg { width: 100%; max-width: 240px; color: #a8b590; }
 .vehicle-index { position: absolute; top: 18px; left: 20px; font-size: 9px; letter-spacing: 1.3px; color: #a2a49d; }
@@ -121,6 +136,23 @@ select:disabled { color: #8d9186; cursor: not-allowed; }
 .photo-preview img { object-fit: contain; background: #10110f; }
 .photo-background-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 12px; }
 .photo-background-actions span { color: var(--muted); font-size: 11px; line-height: 1.5; }
+@media (max-width: 600px) {
+  .vehicle-grid { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .vehicle-grid::-webkit-scrollbar { display: none; }
+  .vehicle-grid > .vehicle-card { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+  .vehicle-slide-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+  .vehicle-slide-controls span { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .vehicle-slide-controls button { width: 44px; height: 44px; border: 1px solid #ffffff22; border-radius: 50%; background: #191b17; color: var(--accent); font-size: 20px; }
+  .vehicle-slide-controls button:disabled { cursor: default; opacity: .3; }
+}
+@media (prefers-reduced-motion: reduce) { .vehicle-grid { scroll-behavior: auto; } }
+@media (max-width: 600px) {
+  .vehicle-card .vehicle-details { padding: 20px; text-align: center; }
+  .vehicle-card .mileage { align-items: center; margin-top: 18px; padding-top: 14px; gap: 6px; }
+  .vehicle-card .vehicle-detail-link { justify-content: center; gap: 12px; margin-top: 18px; }
+  .vehicle-card .vehicle-actions { justify-content: center; margin-top: 12px; }
+  .vehicle-card .remove-link { font-size: 11px; }
+}
 .photo-clear { position: absolute; right: 10px; bottom: 10px; font-size: 10px; background: #10110fe6; padding: 8px 10px; min-height: 34px; }
 
 .vehicle-detail-link { display: flex; justify-content: space-between; margin-top: 22px; padding: 12px 0; border-bottom: 1px solid #ffffff20; color: var(--accent); font-size: 13px; text-decoration: none; }

@@ -1,0 +1,1 @@
+ALTER TABLE account_vehicles ADD COLUMN position BIGINT NOT NULL DEFAULT 0;

@@ -2,6 +2,7 @@
 
 import { getSupabase } from "./supabase";
 import { readVehicles, STORAGE_KEY, type Vehicle } from "./vehicles";
+import { applyVehicleOrder } from "./vehicle-order";
 
 export const CHANGE_EVENT = "motorva:garage-change";
 let saving = false;
@@ -15,7 +16,7 @@ async function session() {
   return data.session;
 }
 
-async function request(owner: string, path = "", method = "GET", vehicle?: Vehicle) {
+async function request(owner: string, path = "", method = "GET", vehicle?: Vehicle | { ids: string[] }) {
   const current = await session();
   if (!current || current.user.id !== owner) throw new Error("Your account changed. Please try again.");
   const base = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -28,6 +29,8 @@ async function request(owner: string, path = "", method = "GET", vehicle?: Vehic
     if (response.status === 401) throw new Error("Your session expired. Sign in again.");
     if (response.status === 400) throw new Error("The backend rejected the vehicle or photo format. If you just updated Motorva, restart the backend and try again.");
     if (response.status === 413) throw new Error("The photo is too large for the server. Try a smaller image.");
+    if (response.status === 409) throw new Error("Your garage changed. Close this window and try reordering again.");
+    if (response.status === 405) throw new Error("Restart the Motorva backend to enable the new garage order feature.");
     throw new Error("Account storage couldn't be updated. Check the backend and try again.");
   }
   return response.status === 204 ? undefined : response.json();
@@ -35,6 +38,24 @@ async function request(owner: string, path = "", method = "GET", vehicle?: Vehic
 
 export async function loadAccountGarage(owner: string): Promise<Vehicle[]> {
   return readVehicles(JSON.stringify(await request(owner)));
+}
+
+export async function saveGarageOrder(ids: string[]) {
+  if (saving) throw new Error("Another change is still saving. Please wait.");
+  saving = true;
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+  try {
+    const current = await session();
+    if (current) {
+      await request(current.user.id, "/order", "PUT", { ids });
+    } else {
+      const next = applyVehicleOrder(readVehicles(window.localStorage.getItem(STORAGE_KEY)), ids);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    }
+  } finally {
+    saving = false;
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  }
 }
 
 export async function mutateGarage(update: (raw: string | null) => Vehicle[]) {

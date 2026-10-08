@@ -150,6 +150,17 @@ notice appears only when browser vehicle IDs are missing from the loaded account
 garage. Local Supabase connectivity and importing have been verified; the full
 multi-account user journey remains to be tested before deployment.
 
+## Garage order
+
+**Reorder cars** opens a draft list with drag grips and accessible move buttons.
+**Save order** persists the arrangement; Cancel leaves it unchanged. Guests save
+the ordered vehicle array in browser storage. Signed-in users send only vehicle
+IDs to `PUT /api/vehicles/order`; existing photo/service data is not overwritten.
+The backend validates an exact, unique set of the current user's vehicle IDs
+and updates positions in a transaction. A stale list is rejected instead of
+discarding newly added vehicles. New vehicles append to the end. Restart the
+backend to apply Flyway V3 and load this endpoint after updating.
+
 ## Optional photo background removal
 
 Choose **Remove background** in the upload preview to try a local U2NETP

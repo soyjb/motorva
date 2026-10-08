@@ -10,8 +10,12 @@ public class AccountVehicle {
     @Column(nullable=false) private UUID ownerId;
     @Column(nullable=false) private UUID vehicleId;
     @Column(nullable=false, columnDefinition="text") private String payload;
+    @Column(nullable=false) private long position;
     protected AccountVehicle() {}
     AccountVehicle(UUID ownerId, UUID vehicleId) { this.id = UUID.randomUUID(); this.ownerId = ownerId; this.vehicleId = vehicleId; }
     String payload() { return payload; }
     void payload(String payload) { this.payload = payload; }
+    UUID vehicleId() { return vehicleId; }
+    long position() { return position; }
+    void position(long position) { this.position = position; }
 }

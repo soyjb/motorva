@@ -15,6 +15,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccountVehicleTests {
     @Autowired MockMvc mvc;
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Test void orderIsPersistentOwnerScopedAndDoesNotOverwriteVehicleData() throws Exception {
+        String owner = UUID.randomUUID().toString(), other = UUID.randomUUID().toString();
+        String first = UUID.randomUUID().toString(), second = UUID.randomUUID().toString(), third = UUID.randomUUID().toString();
+        for (String id : new String[]{first, second}) {
+            String body = "{\"id\":\"" + id + "\",\"year\":2024,\"make\":\"Toyota\",\"model\":\"Camry\",\"mileage\":24000}";
+            mvc.perform(put("/api/vehicles/"+id).with(jwt().jwt(token -> token.subject(owner))).contentType("application/json").content(body)).andExpect(status().isOk());
+        }
+        String order = "{\"ids\":[\""+second+"\",\""+first+"\"]}";
+        mvc.perform(put("/api/vehicles/order").contentType("application/json").content(order)).andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/vehicles/order").with(jwt().jwt(token -> token.subject(other))).contentType("application/json").content(order)).andExpect(status().isConflict());
+        mvc.perform(put("/api/vehicles/order").with(jwt().jwt(token -> token.subject(owner))).contentType("application/json").content(order)).andExpect(status().isNoContent());
+        String update = "{\"id\":\""+second+"\",\"year\":2024,\"make\":\"Toyota\",\"model\":\"Camry\",\"mileage\":25000}";
+        mvc.perform(put("/api/vehicles/"+second).with(jwt().jwt(token -> token.subject(owner))).contentType("application/json").content(update)).andExpect(status().isOk());
+        mvc.perform(get("/api/vehicles").with(jwt().jwt(token -> token.subject(owner))))
+                .andExpect(jsonPath("$[0].id").value(second)).andExpect(jsonPath("$[0].mileage").value(25000)).andExpect(jsonPath("$[1].id").value(first));
+        for (String invalid : new String[]{"{\"ids\":[]}", "{\"ids\":[\""+second+"\",\""+second+"\"]}", "{\"ids\":[\""+second+"\",\""+third+"\"]}"})
+            mvc.perform(put("/api/vehicles/order").with(jwt().jwt(token -> token.subject(owner))).contentType("application/json").content(invalid)).andExpect(status().isConflict());
+        update = "{\"id\":\""+third+"\",\"year\":2024,\"make\":\"Toyota\",\"model\":\"Camry\",\"mileage\":0}";
+        mvc.perform(put("/api/vehicles/"+third).with(jwt().jwt(token -> token.subject(owner))).contentType("application/json").content(update)).andExpect(status().isOk());
+        mvc.perform(get("/api/vehicles").with(jwt().jwt(token -> token.subject(owner)))).andExpect(jsonPath("$[2].id").value(third));
+        mvc.perform(put("/api/vehicles/order").with(jwt().jwt(token -> token.subject(owner))).contentType("application/json").content(order)).andExpect(status().isConflict());
+    }
     @Test void acceptsPngPhotosAndRejectsSvgPhotos() throws Exception {
         String owner = UUID.randomUUID().toString();
         String id = UUID.randomUUID().toString();
