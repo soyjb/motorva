@@ -14,6 +14,7 @@ public class AccountVehicle {
     protected AccountVehicle() {}
     AccountVehicle(UUID ownerId, UUID vehicleId) { this.id = UUID.randomUUID(); this.ownerId = ownerId; this.vehicleId = vehicleId; }
     String payload() { return payload; }
+    UUID id() { return id; }
     void payload(String payload) { this.payload = payload; }
     UUID vehicleId() { return vehicleId; }
     long position() { return position; }

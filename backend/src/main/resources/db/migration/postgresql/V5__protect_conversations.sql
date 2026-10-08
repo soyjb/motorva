@@ -1,0 +1,1 @@
+ALTER TABLE assistant_conversations ENABLE ROW LEVEL SECURITY;

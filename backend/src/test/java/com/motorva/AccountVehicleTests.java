@@ -15,6 +15,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccountVehicleTests {
     @Autowired MockMvc mvc;
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Test void assistantRequiresLoginAndOwnershipAndValidQuestion() throws Exception {
+        String owner = UUID.randomUUID().toString(), other = UUID.randomUUID().toString(), id = UUID.randomUUID().toString();
+        String body = "{\"id\":\""+id+"\",\"year\":2024,\"make\":\"Toyota\",\"model\":\"Camry\",\"mileage\":24000}";
+        mvc.perform(put("/api/vehicles/"+id).with(jwt().jwt(token->token.subject(owner))).contentType("application/json").content(body)).andExpect(status().isOk());
+        String path = "/api/vehicles/"+id+"/assistant", question = "{\"question\":\"My brakes failed\"}";
+        mvc.perform(post(path).contentType("application/json").content(question)).andExpect(status().isUnauthorized());
+        mvc.perform(post(path).with(jwt().jwt(token->token.subject(other))).contentType("application/json").content(question)).andExpect(status().isNotFound());
+        mvc.perform(post(path).with(jwt().jwt(token->token.subject(owner))).contentType("application/json").content(question)).andExpect(status().isOk()).andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("qualified mechanic")));
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(get(path).with(jwt().jwt(token->token.subject(other)))).andExpect(status().isNotFound());
+        mvc.perform(get(path).with(jwt().jwt(token->token.subject(owner)))).andExpect(jsonPath("$[0].text").value("My brakes failed")).andExpect(jsonPath("$[1].role").value("assistant"));
+        mvc.perform(post(path).with(jwt().jwt(token->token.subject(owner))).contentType("application/json").content("{\"question\":\"Can I drive it?\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("qualified mechanic")));
+        mvc.perform(delete(path).with(jwt().jwt(token->token.subject(other)))).andExpect(status().isNotFound());
+        mvc.perform(delete(path).with(jwt().jwt(token->token.subject(owner)))).andExpect(status().isNoContent());
+        mvc.perform(get(path).with(jwt().jwt(token->token.subject(owner)))).andExpect(content().json("[]"));
+        mvc.perform(post(path).with(jwt().jwt(token->token.subject(owner))).contentType("application/json").content(question)).andExpect(status().isOk());
+        UUID conversationId = jdbc.queryForObject("select id from motorva.account_vehicles where owner_id=? and vehicle_id=?", UUID.class, UUID.fromString(owner), UUID.fromString(id));
+        mvc.perform(delete("/api/vehicles/"+id).with(jwt().jwt(token->token.subject(owner)))).andExpect(status().isNoContent());
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject("select count(*) from motorva.assistant_conversations where id=?", Integer.class, conversationId));
+        mvc.perform(get(path).with(jwt().jwt(token->token.subject(owner)))).andExpect(status().isNotFound());
+        mvc.perform(post(path).with(jwt().jwt(token->token.subject(owner))).contentType("application/json").content("{\"question\":\"\"}")).andExpect(status().isBadRequest());
+    }
     @Test void orderIsPersistentOwnerScopedAndDoesNotOverwriteVehicleData() throws Exception {
         String owner = UUID.randomUUID().toString(), other = UUID.randomUUID().toString();
         String first = UUID.randomUUID().toString(), second = UUID.randomUUID().toString(), third = UUID.randomUUID().toString();

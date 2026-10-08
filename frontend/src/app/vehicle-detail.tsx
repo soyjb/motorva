@@ -8,6 +8,7 @@ import VehicleImage from "./vehicle-image";
 import ServiceHistory from "./service-history";
 import MaintenanceReminders from "./maintenance-reminders";
 import AccountLink from "./account-link";
+import VehicleAssistant from "./vehicle-assistant";
 
 const numberFormat = new Intl.NumberFormat("en-US");
 
@@ -52,6 +53,7 @@ export default function VehicleDetail({ id }: { id: string }) {
         </section>
         <MaintenanceReminders vehicle={vehicle} />
         <ServiceHistory vehicle={vehicle} />
+        <VehicleAssistant key={vehicle.id} id={vehicle.id} account={account} />
         <footer className="garage-footer"><span>YOUR VEHICLES. YOUR JOURNEY.</span><p>{account ? "Saved to your Motorva account." : "Guest garage: saved in this browser."}</p></footer>
       </>}
     </main>
