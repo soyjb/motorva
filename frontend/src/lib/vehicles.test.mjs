@@ -4,6 +4,13 @@ import { isVehicle, MAX_PHOTO_LENGTH, MAX_YEAR, readVehicles, removeSavedVehicle
 
 const vehicle = { id: "test-vehicle", year: 2024, make: "Toyota", model: "Camry", mileage: 24000 };
 
+test("transparent PNG photos can be stored without losing their format", () => {
+  const photo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+  assert.equal(isVehicle({ ...vehicle, photo }), true);
+  assert.equal(readVehicles(JSON.stringify(updateSavedPhoto(JSON.stringify([vehicle]), vehicle.id, photo)))[0].photo, photo);
+  assert.equal(isVehicle({ ...vehicle, photo: "data:image/png;base64,broken!" }), false);
+});
+
 test("detail edits preserve the latest photo and other vehicles, trim names, and allow mileage corrections", () => {
   const photo = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==";
   const other = { ...vehicle, id: "other", mileage: 50000 };

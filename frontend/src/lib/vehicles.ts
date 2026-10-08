@@ -109,7 +109,7 @@ export const MAX_PHOTO_LENGTH = 450000;
 
 export function isVehiclePhoto(value: unknown): value is string {
   return typeof value === "string" && value.length <= MAX_PHOTO_LENGTH &&
-    /^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]+={0,2}$/.test(value);
+    /^data:image\/(?:jpeg;base64,\/9j\/|png;base64,iVBORw0KGgo)[A-Za-z0-9+/]+={0,2}$/.test(value);
 }
 
 export function isVehicle(value: unknown): value is Vehicle {

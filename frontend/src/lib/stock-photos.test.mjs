@@ -4,7 +4,7 @@ import { stockPhotoFor } from "./stock-photos.ts";
 
 test("matches exact make/model names within the supported generation", () => {
   const photo = stockPhotoFor({ make: " TOYOTA ", model: "Camry", year: 2024 });
-  assert.equal(photo.src, "/vehicles/toyota-camry-2018.jpg");
+  assert.equal(photo.src, "/vehicles/toyota-camry-2018-cutout.png");
   assert.ok(photo.caption.includes("2018"));
   assert.ok(photo.author && photo.source && photo.licenseUrl);
   assert.ok(stockPhotoFor({ make: "Honda", model: "Civic", year: 2020 }));

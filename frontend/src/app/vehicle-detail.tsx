@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { CHANGE_EVENT, useGarage } from "@/lib/garage-store";
-import { MAX_YEAR, STORAGE_KEY, updateSavedDetails, type Vehicle } from "@/lib/vehicles";
+import { mutateGarage, useGarage } from "@/lib/garage-store";
+import { MAX_YEAR, updateSavedDetails, type Vehicle } from "@/lib/vehicles";
 import VehicleImage from "./vehicle-image";
 import ServiceHistory from "./service-history";
 import MaintenanceReminders from "./maintenance-reminders";
+import AccountLink from "./account-link";
 
 const numberFormat = new Intl.NumberFormat("en-US");
 
 export default function VehicleDetail({ id }: { id: string }) {
-  const { vehicles, ready, error } = useGarage();
+  const { vehicles, ready, error, account, saving } = useGarage();
   const vehicle = vehicles.find(item => item.id === id);
   const dialog = useRef<HTMLDialogElement>(null);
   const [editing, setEditing] = useState<Vehicle | null>(null);
@@ -25,14 +26,12 @@ export default function VehicleDetail({ id }: { id: string }) {
     dialog.current?.showModal();
   }
 
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const details = { year: Number(data.get("year")), make: String(data.get("make") ?? ""), model: String(data.get("model") ?? ""), mileage: Number(data.get("mileage")) };
     try {
-      const latest = updateSavedDetails(window.localStorage.getItem(STORAGE_KEY), id, details);
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(latest));
-      window.dispatchEvent(new Event(CHANGE_EVENT));
+      await mutateGarage(raw => updateSavedDetails(raw, id, details));
       dialog.current?.close();
       setMessage("Vehicle details saved.");
     } catch {
@@ -41,7 +40,7 @@ export default function VehicleDetail({ id }: { id: string }) {
   }
 
   return <div className="garage-shell">
-    <header className="topbar"><Link href="/" className="brand" aria-label="Motorva home"><span className="brand-mark">M</span>MOTORVA<span className="brand-dot">.</span></Link><span className="topbar-label">YOUR DIGITAL GARAGE</span></header>
+    <header className="topbar"><Link href="/" className="brand" aria-label="Motorva home"><span className="brand-mark">M</span>MOTORVA<span className="brand-dot">.</span></Link><AccountLink /></header>
     <main className="garage-main">
       <Link href="/" className="back-link">← Back to garage</Link>
       {!ready ? <div className="empty-state" role="status">Loading your vehicle…</div> : error ? <div className="storage-error" role="alert">{error}</div> : !vehicle ? <section className="empty-state"><p className="eyebrow">VEHICLE UNAVAILABLE</p><h1>Vehicle not found</h1><p>This vehicle is unavailable in the garage saved in this browser. It may have been removed or saved on another device.</p><Link href="/" className="button-primary">Return to garage</Link></section> : <>
@@ -53,7 +52,7 @@ export default function VehicleDetail({ id }: { id: string }) {
         </section>
         <MaintenanceReminders vehicle={vehicle} />
         <ServiceHistory vehicle={vehicle} />
-        <footer className="garage-footer"><span>YOUR VEHICLES. YOUR JOURNEY.</span><p>Saved in this browser. Available here when you return.</p></footer>
+        <footer className="garage-footer"><span>YOUR VEHICLES. YOUR JOURNEY.</span><p>{account ? "Saved to your Motorva account." : "Guest garage: saved in this browser."}</p></footer>
       </>}
     </main>
     <dialog ref={dialog} className="vehicle-dialog" aria-labelledby="edit-title" onClose={() => { setEditing(null); setFormError(""); }}>
@@ -64,7 +63,7 @@ export default function VehicleDetail({ id }: { id: string }) {
         <label>Make<input name="make" maxLength={60} defaultValue={editing.make} required /></label>
         <label className="full-width">Model<input name="model" maxLength={80} defaultValue={editing.model} required /></label>
         <label className="full-width">Mileage (miles)<input name="mileage" type="number" min="0" max="9999999" step="1" defaultValue={editing.mileage} required /><span className="field-hint">Your current odometer reading. You can correct an earlier entry.</span></label>
-      </div>{formError && <p className="form-error" role="alert">{formError}</p>}<p className="save-note">Your vehicle photo stays with this vehicle.</p><div className="form-actions"><button type="button" className="button-secondary" onClick={() => dialog.current?.close()}>Cancel</button><button className="button-primary" type="submit">Save changes</button></div></form>}
+      </div>{formError && <p className="form-error" role="alert">{formError}</p>}<p className="save-note">Your vehicle photo stays with this vehicle.</p><div className="form-actions"><button type="button" className="button-secondary" onClick={() => dialog.current?.close()}>Cancel</button><button className="button-primary" type="submit" disabled={saving}>Save changes</button></div></form>}
     </dialog>
   </div>;
 }

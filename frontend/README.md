@@ -119,3 +119,50 @@ email or push delivery. Legacy saved garages remain compatible.
 ```powershell
 node --experimental-strip-types --test src/lib/reminders.test.mjs
 ```
+
+## Account sign-in
+
+Copy `.env.example` to `.env.local` in **frontend**, then set the Supabase
+project URL and publishable key. Next.js loads this file; restart or rebuild
+after changing public variables. Never put secret keys or database passwords
+in frontend configuration. Local environment files are ignored by Git.
+
+Open `/account` to create an email/password account, sign in, or sign out on
+this device. Sign-up requires a password of at least 12 characters and follows
+the project's email confirmation settings. Configure Supabase Auth URL settings
+with Site URL `http://localhost:3001` and allowed redirect
+`http://localhost:3001/account` for local development. Production must use its
+own HTTPS origin. Supabase manages auth sessions and token refresh through its
+client SDK. Server authorization is enforced independently by Spring Boot.
+
+Signed-in garages load from the authenticated Spring Boot API configured by
+`NEXT_PUBLIC_API_BASE_URL`. All vehicle, service, photo, and reminder mutations
+save through that API, with reminder completion and service history written as
+one vehicle update. Guests continue using browser storage. Account failures
+show an error instead of falling back to guest data. Account changes clear the
+visible garage until the new account loads.
+
+**Import browser garage** explicitly uploads existing guest vehicles, preserves
+the browser copy, and skips IDs already present in the account. A partial import
+can be retried without overwriting previously imported vehicles. Start the backend
+with its private database configuration before using account storage. The import
+notice appears only when browser vehicle IDs are missing from the loaded account
+garage. Local Supabase connectivity and importing have been verified; the full
+multi-account user journey remains to be tested before deployment.
+
+## Optional photo background removal
+
+Choose **Remove background** in the upload preview to try a local U2NETP
+cutout. **Restore original** reverses the preview; **Cancel background removal**
+terminates processing. Nothing is saved until the photo/vehicle form is submitted.
+The model and ONNX WASM runtime load only on demand from Motorva's own static
+assets. No paid API, inference server, or third-party photo upload is used.
+The lightweight model can miss details or include scenery; review before saving.
+Background work uses a dedicated worker with a two-minute timeout and cleanup
+on cancel/dialog close. PNG alpha is preserved within the existing photo limit.
+
+`postinstall`, `predev`, and `prebuild` copy runtime assets from the pinned
+`onnxruntime-web` dependency. Generated runtime files are ignored by Git;
+the 4.6 MB model and license/attribution files are checked in under
+`public/background-removal`. Remove that folder, the preparation script,
+dependency, helper, and photo-editor controls to retire this experiment.

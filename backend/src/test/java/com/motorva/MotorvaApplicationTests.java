@@ -3,9 +3,12 @@ package com.motorva;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-// Database integration will be tested once PostgreSQL configuration is introduced.
-@SpringBootTest(properties = "spring.autoconfigure.exclude="
-		+ "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration")
+@SpringBootTest(properties = {
+    "spring.datasource.url=jdbc:h2:mem:smoke;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+    "spring.datasource.username=sa", "spring.datasource.password=",
+    "motorva.supabase-url=https://example.supabase.co",
+    "spring.flyway.locations=classpath:db/migration/common"
+})
 class MotorvaApplicationTests {
 
 	@Test

@@ -2,8 +2,9 @@
 
 These images are illustrative stock examples. They are not photos of the
 owner's vehicle, and year, trim, body style, and paint color may differ.
-Files are 960-pixel Wikimedia thumbnails. Motorva fits their display to each
-card with CSS; no recoloring or object removal was performed. CC BY-SA image
+Original JPEG files are 960-pixel Wikimedia thumbnails. The sibling
+`*-cutout.png` files are AI-assisted background-removal adaptations of those
+photos, used by the stock-image cards. Originals are retained. CC BY-SA image
 copies and adaptations remain available under CC BY-SA 4.0.
 
 | Local asset | Original / photographer | License |

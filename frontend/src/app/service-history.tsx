@@ -1,14 +1,15 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import { CHANGE_EVENT } from "@/lib/garage-store";
-import { localDateToday, parseServiceCost, removeServiceRecord, saveServiceRecord, STORAGE_KEY, type ServiceRecord, type Vehicle } from "@/lib/vehicles";
+import { mutateGarage, useGarage } from "@/lib/garage-store";
+import { localDateToday, parseServiceCost, removeServiceRecord, saveServiceRecord, type ServiceRecord, type Vehicle } from "@/lib/vehicles";
 
 const numbers = new Intl.NumberFormat("en-US");
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const dates = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 export default function ServiceHistory({ vehicle }: { vehicle: Vehicle }) {
+  const { saving, account } = useGarage();
   const dialog = useRef<HTMLDialogElement>(null);
   const removeDialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -25,12 +26,7 @@ export default function ServiceHistory({ vehicle }: { vehicle: Vehicle }) {
     dialog.current?.showModal();
   }
 
-  function persist(vehicles: Vehicle[]) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(vehicles));
-    window.dispatchEvent(new Event(CHANGE_EVENT));
-  }
-
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     try {
@@ -40,7 +36,7 @@ export default function ServiceHistory({ vehicle }: { vehicle: Vehicle }) {
         date: String(data.get("date") ?? ""), mileage: Number(data.get("mileage")),
         notes: String(data.get("notes") ?? ""), ...(costCents === undefined ? {} : { costCents }),
       };
-      persist(saveServiceRecord(window.localStorage.getItem(STORAGE_KEY), vehicle.id, record, !!editing));
+      await mutateGarage(raw => saveServiceRecord(raw, vehicle.id, record, !!editing));
       dialog.current?.close();
       setMessage(editing ? "Service record updated." : "Service record added.");
     } catch {
@@ -48,10 +44,10 @@ export default function ServiceHistory({ vehicle }: { vehicle: Vehicle }) {
     }
   }
 
-  function remove() {
+  async function remove() {
     if (!removing) return;
     try {
-      persist(removeServiceRecord(window.localStorage.getItem(STORAGE_KEY), vehicle.id, removing.id));
+      await mutateGarage(raw => removeServiceRecord(raw, vehicle.id, removing.id));
       removeDialog.current?.close(); setMessage("Service record removed.");
     } catch { setRemoveError("We couldn't remove this record. Your saved history has been kept. Please try again."); }
   }
@@ -77,7 +73,7 @@ export default function ServiceHistory({ vehicle }: { vehicle: Vehicle }) {
         <label>Mileage at service<input name="mileage" type="number" min="0" max="9999999" step="1" required defaultValue={editing?.mileage ?? vehicle.mileage} /></label>
         <label className="full-width">Cost (USD, optional)<input name="cost" type="number" min="0" max="999999.99" step="0.01" placeholder="75.00" defaultValue={editing?.costCents === undefined ? "" : (editing.costCents / 100).toFixed(2)} /></label>
         <label className="full-width">Notes (optional)<textarea name="notes" maxLength={2000} rows={4} placeholder="Parts used, work completed, or shop name" defaultValue={editing?.notes ?? ""} /></label>
-      </div>{error && <p className="form-error" role="alert">{error}</p>}<p className="save-note">Saved with this vehicle in this browser.</p><div className="form-actions"><button type="button" className="button-secondary" onClick={() => dialog.current?.close()}>Cancel</button><button className="button-primary" type="submit">Save service</button></div></form>}
+      </div>{error && <p className="form-error" role="alert">{error}</p>}<p className="save-note">{account ? "Saved with this vehicle in your account." : "Saved with this vehicle in this browser."}</p><div className="form-actions"><button type="button" className="button-secondary" onClick={() => dialog.current?.close()}>Cancel</button><button className="button-primary" type="submit" disabled={saving}>Save service</button></div></form>}
     </dialog>
     <dialog ref={removeDialog} className="vehicle-dialog" aria-labelledby="remove-service-title" onClose={() => { setRemoving(null); setRemoveError(""); }}>
       <h2 id="remove-service-title">Remove this service record?</h2><p className="form-intro">{removing?.title} will be removed from this vehicle’s history.</p>{removeError && <p className="form-error" role="alert">{removeError}</p>}<div className="form-actions"><button className="button-secondary" onClick={() => removeDialog.current?.close()}>Keep record</button><button className="button-danger" onClick={remove}>Remove record</button></div>

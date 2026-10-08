@@ -2,11 +2,13 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { isVehicle, readVehicles, removeSavedVehicle, updateSavedPhoto, STORAGE_KEY, type Vehicle } from "@/lib/vehicles";
-import { CHANGE_EVENT, useGarage } from "@/lib/garage-store";
+import { isVehicle, readVehicles, removeSavedVehicle, updateSavedPhoto, type Vehicle } from "@/lib/vehicles";
+import { mutateGarage, useGarage } from "@/lib/garage-store";
+import { importBrowserGarage } from "@/lib/garage-api";
 import VehicleFields from "./vehicle-fields";
 import VehicleImage from "./vehicle-image";
 import PhotoInput from "./photo-input";
+import AccountLink from "./account-link";
 
 const numberFormat = new Intl.NumberFormat("en-US");
 
@@ -50,17 +52,17 @@ export default function Garage() {
     photoDialog.current?.showModal();
   }
 
-  function savePhoto(event: FormEvent<HTMLFormElement>) {
+  async function savePhoto(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!photoTarget || photoBusy) return;
     try {
-      const latest = updateSavedPhoto(window.localStorage.getItem(STORAGE_KEY), photoTarget.id, draftPhoto);
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(latest));
-      window.dispatchEvent(new Event(CHANGE_EVENT));
+      await mutateGarage(raw => updateSavedPhoto(raw, photoTarget.id, draftPhoto));
       setMessage(`Photo updated for ${photoTarget.year} ${photoTarget.make} ${photoTarget.model}.`);
       photoDialog.current?.close();
-    } catch {
-      setPhotoError("We couldn't save your photo. Browser storage may be full, or this vehicle may have been removed in another tab. Your saved garage has been kept.");
+    } catch (cause) {
+      setPhotoError(saved.account
+        ? `${cause instanceof Error ? cause.message : "We couldn't save your account photo. Please try again."} Your saved garage has been kept.`
+        : "We couldn't save your photo. Browser storage may be full, or this vehicle may have been removed in another tab. Your saved garage has been kept.");
     }
   }
 
@@ -70,13 +72,11 @@ export default function Garage() {
     removeDialog.current?.showModal();
   }
 
-  function removeVehicle() {
+  async function removeVehicle() {
     if (!removing) return;
     try {
       // Preserve vehicles added in another tab since confirmation opened.
-      const remaining = removeSavedVehicle(window.localStorage.getItem(STORAGE_KEY), removing.id);
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
-      window.dispatchEvent(new Event(CHANGE_EVENT));
+      await mutateGarage(raw => removeSavedVehicle(raw, removing.id));
       setMessage(`${removing.year} ${removing.make} ${removing.model} removed from your garage.`);
       removeDialog.current?.close();
       addButton.current?.focus();
@@ -85,7 +85,7 @@ export default function Garage() {
     }
   }
 
-  function addVehicle(event: FormEvent<HTMLFormElement>) {
+  async function addVehicle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (photoBusy) return;
     const form = event.currentTarget;
@@ -104,9 +104,7 @@ export default function Garage() {
     }
     try {
       // Read at submission time so another tab's additions are retained.
-      const latest = readVehicles(window.localStorage.getItem(STORAGE_KEY));
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...latest, vehicle]));
-      window.dispatchEvent(new Event(CHANGE_EVENT));
+      await mutateGarage(raw => [...readVehicles(raw), vehicle]);
       form.reset();
       dialog.current?.close();
       setMessage(`${vehicle.year} ${vehicle.make} ${vehicle.model} added to your garage.`);
@@ -115,10 +113,17 @@ export default function Garage() {
     }
   }
 
+  async function importGarage() {
+    try {
+      const count = await importBrowserGarage();
+      setMessage(count === 0 ? "Your browser vehicles are already in your account." : `${count} ${count === 1 ? "vehicle imported" : "vehicles imported"}. Existing account vehicles were kept.`);
+    } catch { setMessage("Import couldn't finish. Check the backend and retry. Already imported vehicles stay saved; your browser garage is kept."); }
+  }
+
   return <div className="garage-shell">
     <header className="topbar">
       <Link href="/" className="brand" aria-label="Motorva home"><span className="brand-mark">M</span>MOTORVA<span className="brand-dot">.</span></Link>
-      <span className="topbar-label"><span className="status-dot" /> YOUR DIGITAL GARAGE</span>
+      <AccountLink />
     </header>
     <main className="garage-main">
       <section className="intro" aria-labelledby="garage-title">
@@ -127,17 +132,18 @@ export default function Garage() {
         <div className="garage-counter"><span className="counter-number">{ready && !saved.error ? String(saved.vehicles.length).padStart(2, "0") : "—"}</span><span>VEHICLES IN YOUR GARAGE</span></div>
       </section>
       <section className="vehicles-section" aria-labelledby="vehicles-title">
+        {saved.account && saved.pendingImports > 0 && <div className="account-import"><p>{saved.pendingImports} {saved.pendingImports === 1 ? "vehicle saved only in this browser." : "vehicles saved only in this browser."} Import to keep {saved.pendingImports === 1 ? "it" : "them"} in your account.</p><button className="button-secondary" disabled={saved.saving} onClick={() => void importGarage()}>Import browser garage</button></div>}
         <div className="section-heading"><div><p className="eyebrow">THE LINEUP</p><h2 id="vehicles-title">My vehicles</h2></div>
           <button ref={addButton} className="button-primary" onClick={openForm} disabled={!ready || !!saved.error}><span aria-hidden="true">＋</span> Add vehicle</button></div>
         <p className="announcement" role="status">{message}</p>
         {!ready ? <div className="empty-state" role="status">Loading your garage…</div> : saved.error ? <div className="storage-error" role="alert">{saved.error}</div> : saved.vehicles.length === 0 ?
           <div className="empty-state"><div className="empty-car"><Car /></div><p className="eyebrow">EVERY GARAGE STARTS WITH ONE</p><h3>Make room for your first ride.</h3><p>Add your vehicle’s details to get your garage started.</p><button className="button-primary" onClick={openForm}>Add your first vehicle <span aria-hidden="true">↗</span></button></div> :
           <div className="vehicle-grid">{saved.vehicles.map((vehicle, index) => <article className="vehicle-card" key={vehicle.id} aria-label={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}>
-            <VehicleImage vehicle={vehicle}><span className="vehicle-index">{String(index + 1).padStart(2, "0")} / MOTORVA GARAGE</span><Car /></VehicleImage>
-            <div className="vehicle-details"><p className="eyebrow">{vehicle.make}</p><h3>{vehicle.model}</h3><div className="mileage"><span>ODOMETER</span><strong>{numberFormat.format(vehicle.mileage)} <small>mi</small></strong></div><Link href={`/vehicles/${encodeURIComponent(vehicle.id)}`} className="vehicle-detail-link">View vehicle <span aria-hidden="true">↗</span></Link><div className="vehicle-actions"><button className="text-button" aria-label={`${vehicle.photo ? "Change" : "Add"} photo for ${vehicle.year} ${vehicle.make} ${vehicle.model}`} onClick={() => openPhoto(vehicle)}>{vehicle.photo ? "Change photo" : "Add your photo"}</button><button className="remove-link" aria-label={`Remove ${vehicle.year} ${vehicle.make} ${vehicle.model}`} onClick={() => confirmRemoval(vehicle)}>Remove vehicle</button></div></div>
+            <VehicleImage vehicle={vehicle} onEditPhoto={() => openPhoto(vehicle)}><span className="vehicle-index">{String(index + 1).padStart(2, "0")} / MOTORVA GARAGE</span><Car /></VehicleImage>
+            <div className="vehicle-details"><p className="eyebrow">{vehicle.make}</p><h3>{vehicle.model}</h3><div className="mileage"><span>ODOMETER</span><strong>{numberFormat.format(vehicle.mileage)} <small>mi</small></strong></div><Link href={`/vehicles/${encodeURIComponent(vehicle.id)}`} className="vehicle-detail-link">View vehicle <span aria-hidden="true">↗</span></Link><div className="vehicle-actions"><button className="remove-link" aria-label={`Remove ${vehicle.year} ${vehicle.make} ${vehicle.model}`} onClick={() => confirmRemoval(vehicle)}>Remove vehicle</button></div></div>
           </article>)}</div>}
       </section>
-      <footer className="garage-footer"><span>YOUR VEHICLES. YOUR JOURNEY.</span><p>Saved in this browser. Available here when you return.</p></footer>
+      <footer className="garage-footer"><span>YOUR VEHICLES. YOUR JOURNEY.</span><p>{saved.account ? "Saved to your Motorva account." : <>Saved in this browser. <Link href="/account">Create a free account</Link> to keep your garage across devices.</>}</p></footer>
     </main>
     <dialog ref={dialog} className="vehicle-dialog" aria-labelledby="form-title" onClose={() => { setFormError(""); setFormOpen(false); setDraftPhoto(undefined); setPhotoBusy(false); }}>
       <div className="dialog-heading"><div><p className="eyebrow">EXPAND YOUR LINEUP</p><h2 id="form-title">Add a vehicle</h2></div><button className="close-button" aria-label="Close add vehicle form" onClick={() => { dialog.current?.close(); dialog.current?.querySelector("form")?.reset(); }}>×</button></div>
@@ -146,7 +152,7 @@ export default function Garage() {
         {formOpen && <VehicleFields />}
         {formOpen && <PhotoInput value={draftPhoto} onChange={setDraftPhoto} onBusyChange={setPhotoBusy} />}
         {formError && <p className="form-error" role="alert">{formError}</p>}
-        <p className="save-note">Saved to your garage in this browser.</p><div className="form-actions"><button type="button" className="button-secondary" onClick={() => { dialog.current?.close(); dialog.current?.querySelector("form")?.reset(); }}>Cancel</button><button type="submit" className="button-primary" disabled={photoBusy}>Save vehicle <span aria-hidden="true">↗</span></button></div>
+        <p className="save-note">{saved.account ? "Saved to your account garage." : "Saved to your garage in this browser."}</p><div className="form-actions"><button type="button" className="button-secondary" onClick={() => { dialog.current?.close(); dialog.current?.querySelector("form")?.reset(); }}>Cancel</button><button type="submit" className="button-primary" disabled={photoBusy || saved.saving}>Save vehicle <span aria-hidden="true">↗</span></button></div>
       </form>
     </dialog>
     <dialog ref={photoDialog} className="vehicle-dialog" aria-labelledby="photo-title" onClose={() => { setPhotoTarget(null); setDraftPhoto(undefined); setPhotoError(""); setPhotoBusy(false); }}>
@@ -155,8 +161,8 @@ export default function Garage() {
       <form onSubmit={savePhoto}>
         {photoTarget && <PhotoInput value={draftPhoto} onChange={setDraftPhoto} onBusyChange={setPhotoBusy} />}
         {photoError && <p className="form-error" role="alert">{photoError}</p>}
-        <p className="save-note">Your photo is resized for the card and saved only in this browser.</p>
-        <div className="form-actions"><button type="button" className="button-secondary" onClick={() => photoDialog.current?.close()}>Cancel</button><button type="submit" className="button-primary" disabled={photoBusy}>Save photo</button></div>
+        <p className="save-note">Your photo is resized for the card and saved with your vehicle.</p>
+        <div className="form-actions"><button type="button" className="button-secondary" onClick={() => photoDialog.current?.close()}>Cancel</button><button type="submit" className="button-primary" disabled={photoBusy || saved.saving}>Save photo</button></div>
       </form>
     </dialog>
     <dialog ref={removeDialog} className="vehicle-dialog" aria-labelledby="remove-title" aria-describedby="remove-description" onClose={() => { setRemoving(null); setRemoveError(""); }}>
