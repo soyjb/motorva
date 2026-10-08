@@ -17,17 +17,23 @@ may itself contain private information; the UI discloses the OpenAI transfer.
 Responses API uses `store:false`, which does not imply zero provider retention.
 Replies are capped at 500 output tokens, with no automatic retries or tools.
 
-Daily prototype limits: 10 paid attempts per account and 100 across this backend
-process. Failed attempts count. Limits are in memory and reset on restart; this
-is not a dollar spending guarantee or a distributed production rate limiter.
-Configure persistent quotas before public deployment. A browser Cancel stops
-waiting but may not cancel upstream generation or billing.
+Daily limits: 10 paid attempts per account and 100 across all backend instances
+sharing this database. Failed attempts count. Reservations persist in PostgreSQL
+and reset at midnight UTC, not on restart. A transaction locks the global counter
+before updating both limits, so concurrent requests cannot overshoot the count.
+Safety replies bypass paid limits. AI_ACCOUNT_DAILY_LIMIT and AI_GLOBAL_DAILY_LIMIT
+override defaults; setting either to 0 disables paid requests. This is a request
+count cap, not an exact dollar spending guarantee. Each reply is limited to 500
+output tokens and four recent exchanges of context. Existing attempts before this
+migration are not backfilled. Usage records contain account IDs and counters only.
+A browser Cancel stops waiting but may not cancel upstream generation or billing.
 
-Safety keywords produce a deterministic professional-inspection message without
-a paid request. This is a conservative initial guard, not comprehensive symptom
-triage; AI is for records/general education and cannot certify driving safety.
-Questions and replies are not persisted in the garage. Live OpenAI verification
-requires a valid user-supplied API key; automated tests use mocks and cost nothing.
+Recognized safety symptoms produce reviewed next steps and clarifying questions
+without a paid request. These rules are not comprehensive symptom triage; the
+assistant cannot certify driving safety. Successful exchanges are saved separately
+for each account vehicle, with the latest four exchanges included in AI context.
+Live OpenAI verification requires a valid user-supplied API key; automated tests
+use mocks and cost nothing.
 
 Spring Boot foundation targeting Java 21. Set JAVA_HOME to a Java 21 JDK.
 

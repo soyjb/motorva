@@ -14,12 +14,11 @@ public class VehicleAssistantService {
     private final OpenAiVehicleClient client;
     private final AssistantConversationRepository conversations;
     public record Message(String role, String text) {}
-    private LocalDate day = LocalDate.now();
-    private int requests;
-    private final Map<UUID,Integer> perUser = new HashMap<>();
-    VehicleAssistantService(AccountVehicleRepository repository, ObjectMapper mapper, OpenAiVehicleClient client, AssistantConversationRepository conversations) {
+    private final AiUsageLimiter usage;
+    VehicleAssistantService(AccountVehicleRepository repository, ObjectMapper mapper, OpenAiVehicleClient client, AssistantConversationRepository conversations, AiUsageLimiter usage) {
         this.repository = repository; this.mapper = mapper; this.client = client;
         this.conversations = conversations;
+        this.usage = usage;
     }
     private AccountVehicle owned(UUID owner, UUID id) {
         return repository.findByOwnerIdAndVehicleId(owner, id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -50,7 +49,7 @@ public class VehicleAssistantService {
                 answer = VehicleSafetyGuidance.answer(question, history);
             } else {
                 if (!client.configured()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The assistant isn't configured yet.");
-                reserve(owner);
+                usage.reserve(owner);
                 answer = client.answer(context(vehicle), question.strip(), List.copyOf(history.subList(Math.max(0, history.size()-8), history.size())));
             }
             history.add(new Message("user", question.strip()));
@@ -59,12 +58,6 @@ public class VehicleAssistantService {
             conversations.saveAndFlush(conversation);
             return answer;
         } catch (com.fasterxml.jackson.core.JsonProcessingException exception) { throw new IllegalStateException("Invalid stored vehicle", exception); }
-    }
-    private synchronized void reserve(UUID owner) {
-        if (!day.equals(LocalDate.now())) { day = LocalDate.now(); requests = 0; perUser.clear(); }
-        if (requests >= 100 || perUser.getOrDefault(owner,0) >= 10)
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Prototype daily question limit reached. Try again tomorrow.");
-        requests++; perUser.merge(owner,1,Integer::sum);
     }
     static boolean safetyConcern(String question) {
         String text = question.toLowerCase(Locale.ROOT).replace('’', '\'');

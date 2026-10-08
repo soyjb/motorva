@@ -34,7 +34,7 @@ class VehicleAssistantTests {
         when(conversations.findById(vehicle.id())).thenReturn(Optional.of(conversation));
         when(client.configured()).thenReturn(true);
         when(client.answer(anyString(),anyString(),anyList())).thenReturn("Follow-up answer");
-        var service = new VehicleAssistantService(repository,mapper,client,conversations);
+        var service = new VehicleAssistantService(repository,mapper,client,conversations, mock(AiUsageLimiter.class));
         assertEquals("Follow-up answer", service.ask(owner,id,"Explain that again"));
         verify(client).answer(anyString(),eq("Explain that again"),eq(prior.subList(4,12)));
         assertEquals(14, service.history(owner,id).size());
@@ -58,25 +58,28 @@ class VehicleAssistantTests {
         var client = mock(OpenAiVehicleClient.class);
         UUID owner = UUID.randomUUID(), vehicle = UUID.randomUUID();
         when(repository.findByOwnerIdAndVehicleId(owner, vehicle)).thenReturn(Optional.empty());
-        var service = new VehicleAssistantService(repository, mapper, client, mock(AssistantConversationRepository.class));
+        var service = new VehicleAssistantService(repository, mapper, client, mock(AssistantConversationRepository.class), mock(AiUsageLimiter.class));
         assertEquals(404, assertThrows(ResponseStatusException.class, () -> service.ask(owner, vehicle, "What services are recorded?")).getStatusCode().value());
         verifyNoInteractions(client);
     }
     @Test void safetyRulesBypassAiAndDailyLimitStopsAdditionalRequests() {
         var repository = mock(AccountVehicleRepository.class);
         var client = mock(OpenAiVehicleClient.class);
+        var usage = mock(AiUsageLimiter.class);
         UUID owner = UUID.randomUUID(), id = UUID.randomUUID();
         var entity = new AccountVehicle(owner,id);
         entity.payload("{\"id\":\""+id+"\",\"year\":2024,\"make\":\"Toyota\",\"model\":\"Camry\",\"mileage\":24000}");
         when(repository.findByOwnerIdAndVehicleId(owner,id)).thenReturn(Optional.of(entity));
         when(client.configured()).thenReturn(true);
         when(client.answer(anyString(),anyString(),anyList())).thenReturn("Recorded maintenance summary");
-        var service = new VehicleAssistantService(repository,mapper,client, mock(AssistantConversationRepository.class));
+        var service = new VehicleAssistantService(repository,mapper,client, mock(AssistantConversationRepository.class), usage);
         assertTrue(service.ask(owner,id,"My brakes don't work").contains("qualified mechanic"));
         verify(client,never()).answer(anyString(),anyString(),anyList());
-        for (int i=0;i<10;i++) assertEquals("Recorded maintenance summary",service.ask(owner,id,"What services are recorded?"));
+        verifyNoInteractions(usage);
+        assertEquals("Recorded maintenance summary",service.ask(owner,id,"What services are recorded?"));
+        doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS)).when(usage).reserve(owner);
         assertEquals(429,assertThrows(ResponseStatusException.class,()->service.ask(owner,id,"Explain mileage")).getStatusCode().value());
-        verify(client,times(10)).answer(anyString(),anyString(),anyList());
+        verify(client,times(1)).answer(anyString(),anyString(),anyList());
     }
     @Test void contextExcludesPhotosAndPrivateNotesAndParsesRawResponses() throws Exception {
         UUID id = UUID.randomUUID(), serviceId = UUID.randomUUID();
