@@ -1,8 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isVehicle, MAX_PHOTO_LENGTH, MAX_YEAR, readVehicles, removeSavedVehicle, updateSavedPhoto } from "./vehicles.ts";
+import { isVehicle, MAX_PHOTO_LENGTH, MAX_YEAR, readVehicles, removeSavedVehicle, updateSavedPhoto, updateSavedDetails } from "./vehicles.ts";
 
 const vehicle = { id: "test-vehicle", year: 2024, make: "Toyota", model: "Camry", mileage: 24000 };
+
+test("detail edits preserve the latest photo and other vehicles, trim names, and allow mileage corrections", () => {
+  const photo = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==";
+  const other = { ...vehicle, id: "other", mileage: 50000 };
+  const details = { year: 2023, make: " Honda ", model: " Civic ", mileage: 20000 };
+  const updated = updateSavedDetails(JSON.stringify([{ ...vehicle, photo }, other]), vehicle.id, details);
+  assert.deepEqual(updated, [{ ...vehicle, photo, year: 2023, make: "Honda", model: "Civic", mileage: 20000 }, other]);
+  assert.deepEqual(readVehicles(JSON.stringify(updated)), updated);
+});
+
+test("detail edits reject invalid input, corrupt storage, and a removed vehicle", () => {
+  const raw = JSON.stringify([vehicle]);
+  for (const details of [{ ...vehicle, mileage: -1 }, { ...vehicle, mileage: 0.5 }, { ...vehicle, make: " " }, { ...vehicle, year: MAX_YEAR + 1 }]) {
+    assert.throws(() => updateSavedDetails(raw, vehicle.id, details));
+  }
+  assert.throws(() => updateSavedDetails("{", vehicle.id, vehicle));
+  assert.throws(() => updateSavedDetails(raw, "removed", vehicle));
+});
 
 test("new garages are empty and saved vehicles survive a JSON round trip", () => {
   assert.deepEqual(readVehicles(null), []);

@@ -1,36 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { isVehicle, readVehicles, removeSavedVehicle, updateSavedPhoto, STORAGE_KEY, type Vehicle } from "@/lib/vehicles";
+import { CHANGE_EVENT, useGarage } from "@/lib/garage-store";
 import VehicleFields from "./vehicle-fields";
 import VehicleImage from "./vehicle-image";
 import PhotoInput from "./photo-input";
 
-const CHANGE_EVENT = "motorva:garage-change";
-const UNAVAILABLE = "storage-unavailable";
 const numberFormat = new Intl.NumberFormat("en-US");
-
-function subscribe(callback: () => void) {
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY || event.key === null) callback();
-  };
-  window.addEventListener("storage", onStorage);
-  window.addEventListener(CHANGE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", onStorage);
-    window.removeEventListener(CHANGE_EVENT, callback);
-  };
-}
-
-function snapshot() {
-  try { return window.localStorage.getItem(STORAGE_KEY); }
-  catch { return UNAVAILABLE; }
-}
-
-const serverSnapshot = () => null;
-const clientReady = () => true;
-const serverReady = () => false;
 
 function Car({ className = "" }: { className?: string }) {
   return <svg className={className} viewBox="0 0 240 100" fill="none" aria-hidden="true">
@@ -42,14 +20,8 @@ function Car({ className = "" }: { className?: string }) {
 }
 
 export default function Garage() {
-  const raw = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
-  const ready = useSyncExternalStore(subscribe, clientReady, serverReady);
-  const saved = useMemo(() => {
-    try { return { vehicles: readVehicles(raw), error: "" }; }
-    catch { return { vehicles: [] as Vehicle[], error: raw === UNAVAILABLE
-      ? "Browser storage is unavailable. Allow site storage and reload to use your garage."
-      : "Your saved garage could not be read. It has been kept unchanged. Please restore your browser data before adding vehicles." }; }
-  }, [raw]);
+  const saved = useGarage();
+  const ready = saved.ready;
   const dialog = useRef<HTMLDialogElement>(null);
   const removeDialog = useRef<HTMLDialogElement>(null);
   const photoDialog = useRef<HTMLDialogElement>(null);
@@ -162,7 +134,7 @@ export default function Garage() {
           <div className="empty-state"><div className="empty-car"><Car /></div><p className="eyebrow">EVERY GARAGE STARTS WITH ONE</p><h3>Make room for your first ride.</h3><p>Add your vehicle’s details to get your garage started.</p><button className="button-primary" onClick={openForm}>Add your first vehicle <span aria-hidden="true">↗</span></button></div> :
           <div className="vehicle-grid">{saved.vehicles.map((vehicle, index) => <article className="vehicle-card" key={vehicle.id} aria-label={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}>
             <VehicleImage vehicle={vehicle}><span className="vehicle-index">{String(index + 1).padStart(2, "0")} / MOTORVA GARAGE</span><Car /></VehicleImage>
-            <div className="vehicle-details"><p className="eyebrow">{vehicle.make}</p><h3>{vehicle.model}</h3><div className="mileage"><span>ODOMETER</span><strong>{numberFormat.format(vehicle.mileage)} <small>mi</small></strong></div><div className="vehicle-actions"><button className="text-button" aria-label={`${vehicle.photo ? "Change" : "Add"} photo for ${vehicle.year} ${vehicle.make} ${vehicle.model}`} onClick={() => openPhoto(vehicle)}>{vehicle.photo ? "Change photo" : "Add your photo"}</button><button className="remove-link" aria-label={`Remove ${vehicle.year} ${vehicle.make} ${vehicle.model}`} onClick={() => confirmRemoval(vehicle)}>Remove vehicle</button></div></div>
+            <div className="vehicle-details"><p className="eyebrow">{vehicle.make}</p><h3>{vehicle.model}</h3><div className="mileage"><span>ODOMETER</span><strong>{numberFormat.format(vehicle.mileage)} <small>mi</small></strong></div><Link href={`/vehicles/${encodeURIComponent(vehicle.id)}`} className="vehicle-detail-link">View vehicle <span aria-hidden="true">↗</span></Link><div className="vehicle-actions"><button className="text-button" aria-label={`${vehicle.photo ? "Change" : "Add"} photo for ${vehicle.year} ${vehicle.make} ${vehicle.model}`} onClick={() => openPhoto(vehicle)}>{vehicle.photo ? "Change photo" : "Add your photo"}</button><button className="remove-link" aria-label={`Remove ${vehicle.year} ${vehicle.make} ${vehicle.model}`} onClick={() => confirmRemoval(vehicle)}>Remove vehicle</button></div></div>
           </article>)}</div>}
       </section>
       <footer className="garage-footer"><span>YOUR VEHICLES. YOUR JOURNEY.</span><p>Saved in this browser. Available here when you return.</p></footer>
