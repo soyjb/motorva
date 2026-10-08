@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Motorva",
-  description: "Motorva frontend foundation.",
+  description: "Your digital garage. Keep your vehicles and mileage in one place.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
